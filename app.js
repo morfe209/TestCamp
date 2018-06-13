@@ -1,92 +1,56 @@
-var express=require("express"),
-    app=express(),
-    bodyParser= require("body-parser"),
-    mongoose=require("mongoose");
+var express                 = require("express"),
+    bodyParser              = require("body-parser"),
+    mongoose                = require("mongoose"),
+    passport                = require("passport"),
+    LocalStrategy           = require("passport-local"),
+    methodOverride          = require("method-override"),
+    flash                   = require("connect-flash"),
+    Campground              = require("./models/campground"),
+    User                    = require("./models/user"),
+    Comment                 = require("./models/comment"),
+    seedDB                  = require("./seeds")
 
-mongoose.connect("mongodb://localhost/yelp_camp");
-// SCHEMA SETUP
+var commentRounts   = require("./routes/comments"),
+    campgroundRouts = require("./routes/campgrounds"),
+    indexRoutes      =require("./routes/index");
 
-var campgroudsSchema=new mongoose.Schema({
-    name: String,
-    img: String,
-    descr: String
-});
 
-var Campground = mongoose.model("Campground", campgroudsSchema);
 
-//Create a NEW CAMPGROUND
-//====================================================================
-// Campground.create({
-//         name: "Glacier Basin Campground",
-//         img: "https://www.nps.gov/common/uploads/structured_data/B51D1028-1DD8-B71B-0BD70D7C96AD7D46_thumb.jpg",
-//         descr: "A pleasant mix of Douglas fir, Lodgepole pine, Ponderosa pine, and the occasional Engelmann spruce forests the campground, offering equal amounts of sun and shade. Grasses, shrubs and seasonal wildflowers fill the open meadows."
-//     },
-//     function(err, newlyCamp) {
-//         if(err){
-//             console.log("something wrong");
-//         }else{
-//             console.log("add OK");
-//         }
-//     });
+mongoose.connect("mongodb://localhost/yelp_camp_12");
 
-//====================================================================
 
+var app = express()
 app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs");
+app.use(express.static(__dirname+"/public"));
+app.use(methodOverride("_method"));
+app.use(flash());
 
-app.get("/", function(req, res){
-    res.render("landing");
-});
+//seedDB();
 
-app.get("/campgrounds", function(req, res){
-    
-    //Get All campground from DB
-    
-    Campground.find({}, function(err, allcampgrounds){
-        if(err){
-            console.log(err);            
-        }else{
-            res.render("index", {campgrounds: allcampgrounds}    );
-        }
-    });
-    
-        
-});
+//PASSPORT CONFIGURATIONM
+app.use(require("express-session")({
+    secret: "Once again rusty win cutest dog!!",
+    resave: false,
+    saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
-app.post("/campgrounds", function(req, res){
-    var name=req.body.name;
-    var img=req.body.img;
-    var descr=req.body.descr;
-    var newCampg={name: name, img: img, descr: descr};
-   //Create a new campgrount
-   Campground.create(newCampg, function(err, newlyCamp){
-       if(err){
-           console.log(err)
-       }else{
-            res.redirect("/campgrounds"); 
-       }
-   });
-});
 
-app.get("/campgrounds/new", function(req, res) {
-   res.render("new");
+app.use(function(req, res, next){
+   res.locals.currentUser   = req.user;
+   res.locals.error = req.flash("error");
+   res.locals.success = req.flash("success");
+   next();
 });
-
-// SHOW s more info
-app.get("/campgrounds/:id", function(req, res) {
-    Campground.findById(req.params.id, function(err, foundCamp){
-        if(err){
-            console.log("errr");
-        }else{
-            res.render("show", {campground: foundCamp});
-        }
-        
-    });
-    
-    
-   
-});
+app.use("/", indexRoutes);
+app.use("/campgrounds", campgroundRouts);
+app.use("/campgrounds/:id/comments", commentRounts);
 
 app.listen(process.env.PORT, process.env.IP, function(){
-   console.log("Yelp Camp server running"); 
+   console.log("Yelp Camp server running");
 });
